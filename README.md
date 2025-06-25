@@ -63,80 +63,138 @@ __Promethus Graph Here__
 
 
 ## Self Hosted Kubernetes   
-Similarly, in a Kubernetes deployment, an instance of Visus needs to run adjacent to each CRDB pod on each Kubernetes worker node.  This can be accomplished in Kubernetes by running Visus as a DaemonSet.  When the DaemonSet manifest file is applied against the Kubernetes cluster, a Visus pod is created on each Kubernetes worker node.
+If you don’t have a deployment of CRDB running on Kubernetes, follow the helm instructions [here](https://www.cockroachlabs.com/docs/stable/deploy-cockroachdb-with-kubernetes?filters=helm). In a Kubernetes deployment, an instance of Visus needs to run adjacent to each CRDB pod.  This can be accomplished in Kubernetes by running Visus as a sidecar process on each CRDB node. This can be enabled with the functionality that was enabled via the [Visus sidecar config pull request.](https://github.com/cockroachdb/helm-charts/pull/507).
 
-If you don’t have a deployment of CRDB running on Kubernetes, follow the instructions here.  I created a secure CRDB deployment on GKE using manual statefulset config files.  Edit the statefulset to pull the desired version of CRDB.  I used the container image cockroachdb/cockroach:v23.2.12 to match the version my customers are running.  
+You can deploy the Visus sidecars along side the CRDB nodes with the following command on installation:
+```
+helm install my-release cockroachdb/cockroachdb --set visus.enabled=true --set visus.insecure=false
+```
 
+Alternatively, you can update an existing helm installation:
 Once you have deployed CRDB, verify the CRDB pods are in a ready status.
 ```
-% kubectl get pods
-NAME                        READY   STATUS    RESTARTS   AGE
-cockroachdb-0               1/1     Running   0          15d
-cockroachdb-1               1/1     Running   0          15d
-cockroachdb-2               1/1     Running   0          15d
-cockroachdb-client-secure   1/1     Running   0          11d
+> kubectl get pods
+NAME                                READY   STATUS      RESTARTS   AGE
+my-release-cockroachdb-0            1/1     Running     0          3m4s
+my-release-cockroachdb-1            1/1     Running     0          3m32s
+my-release-cockroachdb-2            1/1     Running     0          4m13s
+my-release-cockroachdb-init-5dp5n   0/1     Completed   0          4m13s
+```
+You can then upgrade the package to enable visus.
+```
+helm upgrade my-release cockroachdb/cockroachdb --set visus.enabled=true --set visus.insecure=false
+```
+The sidecars are now resident in the pods:
+```
+> kubectl get pods
+NAME                                READY   STATUS      RESTARTS   AGE
+my-release-cockroachdb-0            2/2     Running     0          77s
+my-release-cockroachdb-1            2/2     Running     0          103s
+my-release-cockroachdb-2            2/2     Running     0          2m23s
+my-release-cockroachdb-init-l6lkt   0/1     Completed   0          2m26s
 ```
 
-The DaemonSet manifest file I created to run Visus in Kubernetes can be found here.  Note that the Cockroach certificates are mounted similarly as they are in the CRDB statefulset manifest so that Visus can use the certs to access the secure CRDB cluster.  Apply the manifest file with the command. 
-```
-% kubectl create -f visus-daemonset.yaml
-daemonset.apps/visus created
-
-Verify that the Visus pods are created and in a ready status.
-% kubectl get pods
-NAME                        READY   STATUS    RESTARTS   AGE
-cockroachdb-0               1/1     Running   0          15d
-cockroachdb-1               1/1     Running   0          15d
-cockroachdb-2               1/1     Running   0          15d
-cockroachdb-client-secure   1/1     Running   0          11d
-visus-f6bx6                 1/1     Running   0          11d
-visus-lxrmr                 1/1     Running   0          11d
-visus-vmq9z                 1/1     Running   0          11d
-```
 With the Visus pods running we can now initialize and load metric configurations.  This presents a bit of a challenge because the Visus docker image is not built on a base image that contains bash or any other command line tooling.  All Visus commands must be executed as kubectl commands instead of using kubectl to exec into the Visus pods and issue “normal” linux commands.
 
 To initialize Visus run the following command.  Note that the certificate paths in the postgresql connection string below map to the secrets mountPath in the visus-daemonset.yaml manifest.
 ```
-% kubectl exec -it visus-f6bx6 -- visus init --url "postgresql://root@cockroachdb-0.cockroachdb:26257/defaultdb?sslmode=verify-full&sslrootcert=/cockroach/cockroach-cert/ca.crt&sslcert=/cockroach/cockroach-cert/client.root.crt&sslkey=/cockroach/cockroach-cert/client.root.key"
+> kubectl exec -it my-release-cockroachdb-0  -c visus -- visus \
+      init \
+      --url \
+      "postgres://root@localhost:26257/defaultdb?application_name=visus&sslmode=require&ssrootcert=/cockroach/client/ca.crt&sslcert=/cockroach/client/client.root.crt&sslkey=/cockroach/client/client.root.key"
+Database initialized at postgres://root@localhost:26257/defaultdb?application_name=visus&sslmode=require&ssrootcert=/cockroach/client/ca.crt&sslcert=/cockroach/client/client.root.crt&sslkey=/cockroach/client/client.root.key
+
 ```
 
-Start a CRDB command line SQL session to verify the _visus database and tables were created.
+[Start a CRDB command line SQL session](https://www.cockroachlabs.com/docs/stable/deploy-cockroachdb-with-kubernetes?filters=helm#step-3-use-the-built-in-sql-client) to verify the _visus database and tables were created.
 ```
-root@cockroachdb-public:26257/_visus> show tables;                                                                                                    
-  schema_name | table_name | type  | owner | estimated_row_count | locality
---------------+------------+-------+-------+---------------------+-----------
-  public      | collection | table | root  |                   1 | NULL
-  public      | histogram  | table | root  |                   0 | NULL
-  public      | metric     | table | root  |                   1 | NULL
-  public      | node       | table | root  |                   0 | NULL
-  public      | pattern    | table | root  |                   0 | NULL
-  public      | scan       | table | root  |                   0 | NULL
-(6 rows)
+> kubectl exec -it cockroachdb-client-secure -- ./cockroach sql --certs-dir=./cockroach-certs --host=my-release-cockroachdb-public
+#
+# Welcome to the CockroachDB SQL shell.
+# All statements must be terminated by a semicolon.
+# To exit, type: \q.
+#
+# Server version: CockroachDB CCL v25.2.1 (x86_64-pc-linux-gnu, built 2025/06/02 23:17:23, go1.23.7 X:nocoverageredesign) (same version as client)
+# Cluster ID: 7c57f963-01d0-475d-8a18-c03d67b431d9
+#
+# Enter \? for a brief introduction.
+#
+root@my-release-cockroachdb-public:26257/defaultdb> show databases;
+  database_name | owner | primary_region | secondary_region | regions | survival_goal
+----------------+-------+----------------+------------------+---------+----------------
+  _visus        | root  | NULL           | NULL             | {}      | NULL
+  defaultdb     | root  | NULL           | NULL             | {}      | NULL
+  postgres      | root  | NULL           | NULL             | {}      | NULL
+  system        | node  | NULL           | NULL             | {}      | NULL
+(4 rows)
+
+Time: 8ms total (execution 7ms / network 1ms)
 ```
 
+Next we need to load some metric queries we'd like to collect into Visus.
 To load the metric configuration (collection) contained in the query_count.yaml file with definition found here, use the following command
 ```
-% kubectl exec -it visus-f6bx6 -- visus --url "postgresql://root@cockroachdb-0.cockroachdb:26257/defaultdb?sslmode=verify-full&sslrootcert=/cockroach/cockroach-cert/ca.crt&sslcert=/cockroach/cockroach-cert/client.root.crt&sslkey=/cockroach/cockroach-cert/client.root.key" collection put --yaml - < query_count.yaml
+for CRDB_NODE in $(kubectl get pods -o json | jq -r '.items[] | select(.metadata.name | test("^my-release-cockroachdb-[0-9]")) | .metadata.name')
+do
+    kubectl exec -it $CRDB_NODE -c visus  -- visus \
+        --url "postgres://root@localhost:26257/defaultdb?application_name=visus&sslmode=require&ssrootcert=/cockroach/client/ca.crt&sslcert=/cockroach/client/client.root.crt&sslkey=/cockroach/client/client.root.key" \
+        collection put --yaml - < query_count.yaml
+    done
 ```
 
 To test metric configuration (collection) that you just inserted is valid, use the following command
 ```
-% kubectl exec -it visus-f6bx6 -- visus --url "postgresql://root@cockroachdb-0.cockroachdb:26257/defaultdb?sslmode=verify-full&sslrootcert=/cockroach/cockroach-cert/ca.crt&sslcert=/cockroach/cockroach-cert/client.root.crt&sslkey=/cockroach/cockroach-cert/client.root.key" collection test query_count --count 2
+for CRDB_NODE in $(kubectl get pods -o json | jq -r '.items[] | select(.metadata.name | test("^my-release-cockroachdb-[0-9]")) | .metadata.name')
+do
+    echo 📈Testing node $CRDB_NODE metrics📈
+    kubectl exec -it $CRDB_NODE -c visus  -- visus \
+        --url "postgres://root@localhost:26257/defaultdb?application_name=visus&sslmode=require&ssrootcert=/cockroach/client/ca.crt&sslcert=/cockroach/client/client.root.crt&sslkey=/cockroach/client/client.root.key" \
+        collection test query_count --count 2
+    echo 📈Testing Complete📈
+done
+
 ```
 
 Which gives the following output showing that Visus is setup and configured correctly on Kubernetes.
 ```
----- 10-22-2024 19:50:13 query_count -----
-# HELP query_count_exec_count statement count per application and database.
-# TYPE query_count_exec_count counter
-query_count_exec_count{application="",database="defaultdb"} 3
----- 10-26-2024 19:50:23 query_count -----
-# HELP query_count_exec_count statement count per application and database.
-# TYPE query_count_exec_count counter
-query_count_exec_count{application="",database="defaultdb"} 4
-```
+> ./test_metrics.sh
+📈Testing node my-release-cockroachdb-0 metrics📈
 
-All of the configuration files, executable objects and supporting files can be found in this Google Drive location.
+---- 06-25-2025 17:57:08 query_count -----
+# HELP query_count_exec_count statement count per application and database.
+# TYPE query_count_exec_count counter
+query_count_exec_count{application="visus",database="defaultdb"} 17
+
+---- 06-25-2025 17:57:18 query_count -----
+# HELP query_count_exec_count statement count per application and database.
+# TYPE query_count_exec_count counter
+query_count_exec_count{application="visus",database="defaultdb"} 18
+📈Testing Complete📈
+📈Testing node my-release-cockroachdb-1 metrics📈
+
+---- 06-25-2025 17:57:19 query_count -----
+# HELP query_count_exec_count statement count per application and database.
+# TYPE query_count_exec_count counter
+query_count_exec_count{application="visus",database="defaultdb"} 21
+
+---- 06-25-2025 17:57:29 query_count -----
+# HELP query_count_exec_count statement count per application and database.
+# TYPE query_count_exec_count counter
+query_count_exec_count{application="visus",database="defaultdb"} 22
+📈Testing Complete📈
+📈Testing node my-release-cockroachdb-2 metrics📈
+
+---- 06-25-2025 17:57:30 query_count -----
+# HELP query_count_exec_count statement count per application and database.
+# TYPE query_count_exec_count counter
+query_count_exec_count{application="visus",database="defaultdb"} 3
+
+---- 06-25-2025 17:57:40 query_count -----
+# HELP query_count_exec_count statement count per application and database.
+# TYPE query_count_exec_count counter
+query_count_exec_count{application="visus",database="defaultdb"} 4
+📈Testing Complete📈
+```
 
 Install helm
 ```
@@ -147,5 +205,4 @@ helm search repo prometheus-community
 helm install prometheus prometheus-community/prometheus
 
 kubectl port-forward service/prometheus-server 9090:80
-<prometheus configured>
 ```
