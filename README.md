@@ -7,8 +7,12 @@ As a first step, it's strongly recommended that you setup your Prometheus instan
 ## Getting Started:
 
 There are two ways to deploy Visus on CRDB clusters:
-Self Hosted Traditional
-Self Hosted Kubernetes   
+
+[Self Hosted Traditional](#self-hosted-traditional)
+
+[Self Hosted Kubernetes](#self-hosted-kubernetes)   
+
+
 
 
 ## Self Hosted Traditional
@@ -96,7 +100,7 @@ my-release-cockroachdb-init-l6lkt   0/1     Completed   0          2m26s
 
 With the Visus pods running we can now initialize and load metric configurations.  This presents a bit of a challenge because the Visus docker image is not built on a base image that contains bash or any other command line tooling.  All Visus commands must be executed as kubectl commands instead of using kubectl to exec into the Visus pods and issue “normal” linux commands.
 
-To initialize Visus run the following command.  Note that the certificate paths in the postgresql connection string below map to the secrets mountPath in the visus-daemonset.yaml manifest.
+To initialize Visus run the following commands on one of the nodes, this will create the initial `_visus` database.
 ```
 > kubectl exec -it my-release-cockroachdb-0  -c visus -- visus \
       init \
