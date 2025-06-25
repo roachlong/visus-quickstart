@@ -1,4 +1,5 @@
-for each visus node
-    kubectl exec -it visus-f6bx6 -- visus init --url "postgresql://root@cockroachdb-0.cockroachdb:26257/defaultdb?sslmode=verify-full&sslrootcert=/cockroach/cockroach-cert/ca.crt&sslcert=/cockroach/cockroach-cert/client.root.crt&sslkey=/cockroach/cockroach-cert/client.root.key"
-end
-
+#!/usr/bin/env bash
+kubectl exec -it my-release-cockroachdb-0  -c visus -- visus \
+      init \
+      --url \
+      "postgres://root@localhost:26257/defaultdb?application_name=visus&sslmode=require&ssrootcert=/cockroach/client/ca.crt&sslcert=/cockroach/client/client.root.crt&sslkey=/cockroach/client/client.root.key"

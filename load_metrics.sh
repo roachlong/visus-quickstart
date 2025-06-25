@@ -1,3 +1,8 @@
-for each visus node 
-    kubectl exec -it visus_node -- visus --url "postgresql://root@cockroachdb-0.cockroachdb:26257/defaultdb?sslmode=verify-full&sslrootcert=/cockroach/cockroach-cert/ca.crt&sslcert=/cockroach/cockroach-cert/client.root.crt&sslkey=/cockroach/cockroach-cert/client.root.key" collection put --yaml - < query_count.yaml
-done
+#!/usr/bin/env bash
+for CRDB_NODE in $(kubectl get pods -o json | jq -r '.items[] | select(.metadata.name | test("^my-release-cockroachdb-[0-9]")) | .metadata.name')
+do 
+    kubectl exec -it $CRDB_NODE -c visus  -- visus \
+        --url "postgres://root@localhost:26257/defaultdb?application_name=visus&sslmode=require&ssrootcert=/cockroach/client/ca.crt&sslcert=/cockroach/client/client.root.crt&sslkey=/cockroach/client/client.root.key" \
+        collection put --yaml - < query_count.yaml
+    done
+
