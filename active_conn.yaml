@@ -1,0 +1,24 @@
+name: active_conn
+enabled: true
+scope: cluster
+frequency: 15
+maxresults: 50
+labels: [application_name]
+metrics:
+  - name : num_conn
+    kind : gauge
+    help : number of conns per applications
+query:
+  SELECT
+      application_name::string,
+      count(*)::float as num_conn
+  FROM
+      crdb_internal.cluster_sessions
+  WHERE
+      active_queries <> ''
+  GROUP BY
+      1
+  ORDER BY
+      2 DESC
+  LIMIT
+      $1;

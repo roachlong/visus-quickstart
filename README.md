@@ -25,13 +25,14 @@ The steps to install, configure and start Visus on a non-Kubernetes CRDB deploym
 - Load Visus metric profiles to the cluster. `visus collection put -o yaml < query_count.yaml`
 - Configure your Prometheus instance to scrape the Visus endpoint. 
 
-__This link is a roachprod script to deploy a CRDB cluster in GCP, configure a Prometheus VM in the same GCP region and apply the necessary prometheus configuration file to scrape the Visus endpoint.  I have used this script to deploy Visus demos for customers and to show customers the components and steps needed to deploy Visus.__
-
 Once Prometheus is configured and started on the standalone VM point your browser to port 9090 on the public/external address of the VM.  The Prometheus UI will be displayed.  Click on Status and select Targets.  This will show you Visus instances that are reporting metrics.  
 
 ![Prometheus Targets](images/PromTargets.png)
 
-With healthy Prometheus targets and a by loading the following Visus collection on each node by 
+
+Once the Prometheus targets are healthy, Visus is now ready to load the following collection on each node by running the `visus collection put --yaml - < active_conn.yaml` 
+
+`active_conn.yaml` contents:
 ```
 name: active_conn
 enabled: true
@@ -59,7 +60,7 @@ query:
       $1;
 ```
 
-We can view active connections by application name and the output in Prometheus looks like the following
+We can view active connections by application name and the output in Prometheus looks like the following:
 ![Prometheus Graph](images/PromGraph.png)
 
 
@@ -200,10 +201,10 @@ query_count_exec_count{application="visus",database="defaultdb"} 4
 📈Testing Complete📈
 ```
 
-Install helm
+
+Install Helm and Prometheus:
 ```
 brew install helm
-
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 helm search repo prometheus-community
 helm install prometheus prometheus-community/prometheus
