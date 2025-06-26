@@ -29,7 +29,7 @@ __This link is a roachprod script to deploy a CRDB cluster in GCP, configure a P
 
 Once Prometheus is configured and started on the standalone VM point your browser to port 9090 on the public/external address of the VM.  The Prometheus UI will be displayed.  Click on Status and select Targets.  This will show you Visus instances that are reporting metrics.  
 
-__Promethus Image Here__
+![Prometheus Targets](images/PromTargets.png)
 
 With healthy Prometheus targets and a by loading the following Visus collection on each node by 
 ```
@@ -60,7 +60,7 @@ query:
 ```
 
 We can view active connections by application name and the output in Prometheus looks like the following
-__Promethus Graph Here__
+![Prometheus Graph](images/PromGraph.png)
 
 
 
@@ -110,7 +110,7 @@ Database initialized at postgres://root@localhost:26257/defaultdb?application_na
 
 ```
 
-[Start a CRDB command line SQL session](https://www.cockroachlabs.com/docs/stable/deploy-cockroachdb-with-kubernetes?filters=helm#step-3-use-the-built-in-sql-client) to verify the _visus database and tables were created.
+[Start a CRDB command line SQL session](https://www.cockroachlabs.com/docs/stable/deploy-cockroachdb-with-kubernetes?filters=helm#step-3-use-the-built-in-sql-client) to verify the `_visus` database and tables were created.
 ```
 > kubectl exec -it cockroachdb-client-secure -- ./cockroach sql --certs-dir=./cockroach-certs --host=my-release-cockroachdb-public
 #
