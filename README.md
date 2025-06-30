@@ -68,7 +68,7 @@ We can view active connections by application name and the output in Prometheus 
 
 
 ## Self Hosted Kubernetes   
-If you don’t have a deployment of CRDB running on Kubernetes, follow the helm instructions [here](https://www.cockroachlabs.com/docs/stable/deploy-cockroachdb-with-kubernetes?filters=helm). In a Kubernetes deployment, an instance of Visus needs to run adjacent to each CRDB pod.  This can be accomplished in Kubernetes by running Visus as a sidecar process on each CRDB node. This can be enabled with the functionality that was enabled via the [Visus sidecar config pull request.](https://github.com/cockroachdb/helm-charts/pull/507).
+If you don’t have a deployment of CRDB running on Kubernetes, follow the helm instructions [here](https://www.cockroachlabs.com/docs/stable/deploy-cockroachdb-with-kubernetes?filters=helm). In a Kubernetes deployment, an instance of Visus needs to run adjacent to each CRDB pod.  This can be accomplished in Kubernetes by running Visus as a sidecar process on each CRDB node. This can be enabled with the functionality that was created via the [Visus sidecar config pull request](https://github.com/cockroachdb/helm-charts/pull/507).
 
 You can deploy the Visus sidecars along side the CRDB nodes with the following command on installation:
 ```
